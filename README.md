@@ -26,11 +26,11 @@ This project demonstrates a **multithreaded connection pool** implemented using 
 ## Project Structure
 
 
-config – application configuration and loading
-pool – connection pool implementation
-client – client worker simulation
-entity – database connection abstraction
-app – application entry point
+- config – application configuration and loading
+- pool – connection pool implementation
+- client – client worker simulation
+- entity – database connection abstraction
+- app – application entry point
 
 
 
