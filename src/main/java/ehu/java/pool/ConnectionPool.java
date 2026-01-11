@@ -4,7 +4,6 @@ import ehu.java.entity.DatabaseConnection;
 import ehu.java.exception.AcquireTimeoutException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -18,11 +17,12 @@ public final class ConnectionPool {
     private final ReentrantLock lock = new ReentrantLock(true);
     private final Condition hasFreeConnection = lock.newCondition();
 
-    private final Deque<DatabaseConnection> free = new ArrayDeque<>();
+    private final Deque<DatabaseConnection> freeConnections = new ArrayDeque<>();
+    private boolean isPoolClosed = false;
 
     public ConnectionPool(int poolSize) {
         for (int i = 1; i <= poolSize; i++) {
-            free.addLast(new DatabaseConnection(i));
+            freeConnections.addLast(new DatabaseConnection(i));
         }
         log.info("ConnectionPool initialized. size={}", poolSize);
     }
@@ -31,19 +31,21 @@ public final class ConnectionPool {
      * Acquire connection with timeout.
      * If no free connections -> await on Condition until signaled or timeout.
      */
-    public DatabaseConnection acquire(Duration timeout) throws InterruptedException, AcquireTimeoutException {
+    public DatabaseConnection acquire(Duration timeout)
+            throws InterruptedException, AcquireTimeoutException {
         long nanos = timeout.toNanos();
         lock.lock();
         try {
-            while (free.isEmpty()) {
+            if (isPoolClosed) {
+                throw new IllegalStateException("Pool is shutdown");
+            }
+            while (freeConnections.isEmpty() && !isPoolClosed) {
                 if (nanos <= 0L) {
                     throw new AcquireTimeoutException("Timeout: no free connection available");
                 }
-                log.info("No free connections. {} is waiting...", Thread.currentThread().getName());
                 nanos = hasFreeConnection.awaitNanos(nanos);
             }
-
-            DatabaseConnection c = free.removeFirst();
+            DatabaseConnection c = freeConnections.removeFirst();
             log.info("{} acquired connection #{}", Thread.currentThread().getName(), c.getId());
             return c;
         } finally {
@@ -54,30 +56,33 @@ public final class ConnectionPool {
     /**
      * Release connection back to pool and signal waiting thread.
      */
-    public void release(DatabaseConnection c) {
-        if (c == null) return;
+    public void release(DatabaseConnection connection) {
+        if (connection == null) return;
 
         lock.lock();
         try {
-            if (!c.isOpen()) {
-                log.warn("Connection #{} is closed, not returning to pool", c.getId());
+            if (isPoolClosed) {
+                connection.close();
                 return;
             }
 
-            free.addLast(c);
-            log.info("{} released connection #{}", Thread.currentThread().getName(), c.getId());
+            if (!connection.isConnectionOpened()) {
+                log.warn("Connection #{} is closed, not returning to pool", connection.getId());
+                return;
+            }
 
-            // Notify one waiting thread that a resource became available
+            freeConnections.addLast(connection);
             hasFreeConnection.signal();
         } finally {
             lock.unlock();
         }
     }
 
+
     public int freeCount() {
         lock.lock();
         try {
-            return free.size();
+            return freeConnections.size();
         } finally {
             lock.unlock();
         }
@@ -86,8 +91,9 @@ public final class ConnectionPool {
     public void shutdown() {
         lock.lock();
         try {
-            while (!free.isEmpty()) {
-                free.removeFirst().close();
+            isPoolClosed = true;
+            while (!freeConnections.isEmpty()) {
+                freeConnections.removeFirst().close();
             }
             // Wake up all in case someone is waiting forever during shutdown
             hasFreeConnection.signalAll();

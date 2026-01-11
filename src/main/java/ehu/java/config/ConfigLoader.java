@@ -8,20 +8,20 @@ public final class ConfigLoader {
     private ConfigLoader() {}
 
     public static AppConfig load(String classpathResource) throws IOException {
-        Properties p = new Properties();
+        Properties properties = new Properties();
 
         try (InputStream in = ConfigLoader.class.getClassLoader().getResourceAsStream(classpathResource)) {
             if (in == null) {
                 throw new IllegalStateException("Config not found on classpath: " + classpathResource);
             }
-            p.load(in);
+            properties.load(in);
         }
 
-        int poolSize = Integer.parseInt(require(p, "pool.size"));
-        int clientsCount = Integer.parseInt(require(p, "clients.count"));
-        long acquireTimeoutMs = Long.parseLong(require(p, "acquire.timeout.ms"));
-        long minMs = Long.parseLong(require(p, "query.time.ms.min"));
-        long maxMs = Long.parseLong(require(p, "query.time.ms.max"));
+        int poolSize = Integer.parseInt(require(properties, "pool.size"));
+        int clientsCount = Integer.parseInt(require(properties, "clients.count"));
+        long acquireTimeoutMs = Long.parseLong(require(properties, "acquire.timeout.ms"));
+        long minMs = Long.parseLong(require(properties, "query.time.ms.min"));
+        long maxMs = Long.parseLong(require(properties, "query.time.ms.max"));
 
         if (poolSize <= 0 || clientsCount <= 0) {
             throw new IllegalArgumentException("pool.size and clients.count must be > 0");
@@ -29,15 +29,14 @@ public final class ConfigLoader {
         if (minMs < 0 || maxMs < minMs) {
             throw new IllegalArgumentException("query.time range is invalid");
         }
-
         return new AppConfig(poolSize, clientsCount, acquireTimeoutMs, minMs, maxMs);
     }
 
-    private static String require(Properties p, String key) {
-        String v = p.getProperty(key);
-        if (v == null || v.isBlank()) {
+    private static String require(Properties property, String key) {
+        String requiredProperty = property.getProperty(key);
+        if (requiredProperty == null || requiredProperty.isBlank()) {
             throw new IllegalArgumentException("Missing required property: " + key);
         }
-        return v.trim();
+        return requiredProperty.trim();
     }
 }

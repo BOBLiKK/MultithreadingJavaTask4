@@ -7,7 +7,7 @@ public final class DatabaseConnection {
     private static final Logger log = LogManager.getLogger(DatabaseConnection.class);
 
     private final int id;
-    private boolean open = true;
+    private boolean isConnectionOpened = true;
 
     public DatabaseConnection(int id) {
         this.id = id;
@@ -18,19 +18,19 @@ public final class DatabaseConnection {
         return id;
     }
 
-    public boolean isOpen() {
-        return open;
+    public boolean isConnectionOpened() {
+        return isConnectionOpened;
     }
 
-    public void executeQuery(String sql) {
-        if (!open) {
+    public void executeQuery(String string) {
+        if (!isConnectionOpened) {
             throw new IllegalStateException("Connection #" + id + " is closed");
         }
-        log.info("Connection #{} executing query: {}", id, sql);
+        log.info("Connection #{} executing query: {}", id, string);
     }
 
     public void close() {
-        open = false;
+        isConnectionOpened = false;
         log.info("Connection #{} closed", id);
     }
 }
