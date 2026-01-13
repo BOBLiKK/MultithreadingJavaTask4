@@ -10,6 +10,7 @@ public final class ConfigLoader {
     public static AppConfig load(String classpathResource) throws IOException {
         Properties properties = new Properties();
 
+        //taking class->class loader that loaded that class -> looking for resource on classpath
         try (InputStream in = ConfigLoader.class.getClassLoader().getResourceAsStream(classpathResource)) {
             if (in == null) {
                 throw new IllegalStateException("Config not found on classpath: " + classpathResource);

@@ -18,9 +18,7 @@ public final class Application {
         AppConfig appConfig = ConfigLoader.load("app.properties");
 
         ConnectionPool pool = new ConnectionPool(appConfig.poolSize());
-
-        int threads = Math.min(appConfig.clientsCount(), Runtime.getRuntime().availableProcessors());
-        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        ExecutorService executor = Executors.newFixedThreadPool(appConfig.clientsCount());
 
         List<Future<Boolean>> results = new ArrayList<>();
         for (int i = 1; i <= appConfig.clientsCount(); i++) {
@@ -28,9 +26,12 @@ public final class Application {
                     new ClientWorker(i, pool, appConfig.acquireTimeoutMs(), appConfig.queryTimeMinMs(), appConfig.queryTimeMaxMs())
             ));
         }
+        // Stop accepting new tasks
         executor.shutdown();
-        boolean finished = executor.awaitTermination(30, TimeUnit.SECONDS);
+        // Wait up to 10 seconds for all submitted tasks to complete and the executor to terminate
+        boolean finished = executor.awaitTermination(10, TimeUnit.SECONDS);
 
+        // Count successfully completed client tasks using Future results
         long successfulTasksCount = results.stream().filter(f -> {
             try { return f.get(); }
             catch (Exception e) { return false; }

@@ -16,7 +16,6 @@ public final class ConnectionPool {
     // MONITOR: lock + condition
     private final ReentrantLock lock = new ReentrantLock(true);
     private final Condition hasFreeConnection = lock.newCondition();
-
     private final Deque<DatabaseConnection> freeConnections = new ArrayDeque<>();
     private boolean isPoolClosed = false;
 
@@ -43,6 +42,7 @@ public final class ConnectionPool {
                 if (nanos <= 0L) {
                     throw new AcquireTimeoutException("Timeout: no free connection available");
                 }
+                //thread will be woken up if signal() or signalAll() is called or until timeout
                 nanos = hasFreeConnection.awaitNanos(nanos);
             }
             DatabaseConnection c = freeConnections.removeFirst();
@@ -95,7 +95,7 @@ public final class ConnectionPool {
             while (!freeConnections.isEmpty()) {
                 freeConnections.removeFirst().close();
             }
-            // Wake up all in case someone is waiting forever during shutdown
+            // Wake up all in case someone is waiting during shutdown
             hasFreeConnection.signalAll();
             log.info("ConnectionPool shutdown completed");
         } finally {

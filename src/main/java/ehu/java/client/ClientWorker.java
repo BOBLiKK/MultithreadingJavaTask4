@@ -39,7 +39,7 @@ public final class ClientWorker implements Callable<Boolean> {
         try {
             connection = pool.acquire(Duration.ofMillis(acquireTimeoutMs));
 
-            // Each thread uses its own random generator (ThreadLocalRandom) to avoid contention
+            // Each thread uses its own random generator (ThreadLocalRandom) to avoid contention(when multiple threads try to acquire one resource at the same time)
             long workMs = ThreadLocalRandom.current().nextLong(queryMinMs, queryMaxMs + 1);
             connection.executeQuery("SELECT * FROM orders WHERE client_id = " + clientId);
             TimeUnit.MILLISECONDS.sleep(workMs);
